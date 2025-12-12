@@ -1,34 +1,58 @@
 import streamlit as st
 
 # 1. 초기 상태(Session State) 설정
-# st.session_state는 앱의 상태를 저장하고 유지하는 데 사용됩니다.
+# 앱이 시작될 때 필요한 변수들을 st.session_state에 초기화합니다.
 if 'temperature' not in st.session_state:
-    st.session_state.temperature = 0 # 현재 온도의 초기값
+    st.session_state.temperature = 0 # 현재 온도 (초기값: 0도)
 if 'temp_A' not in st.session_state:
-    st.session_state.temp_A = None # A 버튼에 저장된 온도 (초기에는 없음)
+    st.session_state.temp_A = None # A 슬롯에 저장된 온도
 if 'temp_B' not in st.session_state:
-    st.st.session_state.temp_B = None # B 버튼에 저장된 온도
+    st.session_state.temp_B = None # B 슬롯에 저장된 온도
 if 'temp_C' not in st.session_state:
-    st.session_state.temp_C = None # C 버튼에 저장된 온도
+    st.session_state.temp_C = None # C 슬롯에 저장된 온도
+if 'is_saving' not in st.session_state:
+    st.session_state.is_saving = False # 저장 모드 활성화/비활성화 상태
 
 # 2. 버튼 클릭 시 동작할 함수 정의
 def increment_temp():
-    """온도를 1도 증가시킵니다."""
+    """현재 온도를 1도 증가시킵니다."""
     st.session_state.temperature += 1
+    # 저장 모드가 활성화되어 있다면, 온도 변경 시 저장 모드를 자동으로 해제 (선택 사항)
+    st.session_state.is_saving = False 
 
 def decrement_temp():
-    """온도를 1도 감소시킵니다."""
+    """현재 온도를 1도 감소시킵니다."""
     st.session_state.temperature -= 1
+    # 저장 모드가 활성화되어 있다면, 온도 변경 시 저장 모드를 자동으로 해제 (선택 사항)
+    st.session_state.is_saving = False
 
+def activate_save_mode():
+    """저장 버튼을 눌렀을 때 호출되어 저장 모드를 활성화합니다."""
+    st.session_state.is_saving = True
+    
 def save_temp_to_slot(slot_name):
-    """현재 온도를 지정된 슬롯에 저장하고, 저장된 슬롯을 표시합니다."""
-    # 'last_saved_slot' 변수를 추가하여 어떤 슬롯에 저장할지 기억합니다.
-    st.session_state.last_saved_slot = slot_name 
+    """현재 온도를 지정된 슬롯에 저장하고 저장 모드를 비활성화합니다."""
+    
+    # 딕셔너리 접근 방식으로 해당 슬롯에 현재 온도를 저장
+    st.session_state[f'temp_{slot_name}'] = st.session_state.temperature
+    
+    # 저장 완료 후 저장 모드 비활성화
+    st.session_state.is_saving = False 
+    
+    # 성공 메시지 표시 (Streamlit은 재실행되므로, 이 메시지는 잠시 보이고 사라집니다)
+    # st.success(f"현재 온도 ({st.session_state.temperature}°C)가 {slot_name}에 저장되었습니다.")
+
 
 def recall_temp(slot_name):
     """지정된 슬롯에 저장된 온도를 현재 온도로 불러옵니다."""
-    if st.session_state[f'temp_{slot_name}'] is not None:
-        st.session_state.temperature = st.session_state[f'temp_{slot_name}']
+    
+    # 저장된 온도가 None이 아닌지 확인
+    saved_temp = st.session_state[f'temp_{slot_name}']
+    
+    if saved_temp is not None:
+        st.session_state.temperature = saved_temp
+        st.session_state.is_saving = False # 불러오기 시 저장 모드 비활성화
+        # st.success(f"{slot_name}에 저장된 온도 ({saved_temp}°C)를 불러왔습니다.")
     else:
         st.warning(f"경고: {slot_name} 버튼에 저장된 온도가 없습니다.")
 
@@ -37,73 +61,72 @@ def recall_temp(slot_name):
 st.title("🌡️ 온도 조절 및 저장 앱")
 
 # 현재 온도 표시
-# f-string을 사용하여 섭씨(℃)를 표시합니다.
 st.markdown(f"## 현재 온도: **{st.session_state.temperature}°C**")
 
 st.markdown("---")
 
-# 온도 조절 버튼 (+ / -)
+# --- 3-1. 온도 조절 버튼 (+ / -) ---
 st.header("온도 조절")
-col1, col2 = st.columns(2)
-with col1:
+col_plus, col_minus = st.columns(2)
+with col_plus:
     st.button("➕ 1°C 올리기", on_click=increment_temp)
-with col2:
+with col_minus:
     st.button("➖ 1°C 내리기", on_click=decrement_temp)
 
 st.markdown("---")
 
-# 저장 기능: 먼저 '저장' 버튼을 누른 후, A, B, C 중 하나를 누릅니다.
+# --- 3-2. 저장 및 불러오기 기능 ---
 st.header("온도 저장 및 불러오기")
 
-# '저장' 버튼
-if st.button("💾 저장", key="save_button"):
-    st.session_state.is_saving = True # 저장 모드 활성화
-    st.info("저장할 슬롯 (A, B, C)을 선택해 주세요.")
+# '저장' 버튼 (저장 모드 활성화)
+if st.button("💾 저장", key="activate_save", on_click=activate_save_mode):
+    pass # on_click 핸들러에서 상태를 변경하므로, 이 블록에서는 별도의 동작이 필요 없습니다.
 
-# 저장 슬롯 버튼 (A, B, C)
-if st.session_state.get('is_saving', False):
-    # 저장 모드일 때만 A, B, C 버튼이 '저장' 기능을 수행
-    save_cols = st.columns(3)
-    with save_cols[0]:
-        if st.button("A 버튼 (저장)", key="save_A"):
-            st.session_state.temp_A = st.session_state.temperature
-            st.session_state.is_saving = False # 저장 모드 비활성화
-            st.success(f"현재 온도 ({st.session_state.temperature}°C)가 A에 저장되었습니다.")
-    with save_cols[1]:
-        if st.button("B 버튼 (저장)", key="save_B"):
-            st.session_state.temp_B = st.session_state.temperature
-            st.session_state.is_saving = False
-            st.success(f"현재 온도 ({st.session_state.temperature}°C)가 B에 저장되었습니다.")
-    with save_cols[2]:
-        if st.button("C 버튼 (저장)", key="save_C"):
-            st.session_state.temp_C = st.session_state.temperature
-            st.session_state.is_saving = False
-            st.success(f"현재 온도 ({st.session_state.temperature}°C)가 C에 저장되었습니다.")
-            
+# 상태 메시지 표시
+if st.session_state.is_saving:
+    st.info("현재 온도를 저장할 슬롯 (A, B, C)을 **선택해 주세요.**")
 else:
-    # 일반 모드일 때 (저장 모드가 아닐 때) A, B, C 버튼은 '불러오기' 기능을 수행
-    recall_cols = st.columns(3)
-    
-    # A 버튼 불러오기
-    with recall_cols[0]:
+    st.info("A, B, C 버튼을 눌러 저장된 온도를 **불러올 수 있습니다.**")
+
+
+# A, B, C 슬롯 버튼
+slot_cols = st.columns(3)
+
+# A 슬롯
+with slot_cols[0]:
+    if st.session_state.is_saving:
+        # 저장 모드일 때 (저장 기능)
+        st.button("A 버튼 (현재 온도 저장)", key="slot_A_save", 
+                  on_click=save_temp_to_slot, args=['A'])
+    else:
+        # 일반 모드일 때 (불러오기 기능)
         label_A = f"A 불러오기 ({st.session_state.temp_A}°C)" if st.session_state.temp_A is not None else "A (저장된 온도 없음)"
-        if st.button(label_A, on_click=recall_temp, args=['A'], key="recall_A"):
-            if st.session_state.temp_A is not None:
-                st.success(f"A에 저장된 온도 ({st.session_state.temp_A}°C)를 불러왔습니다.")
+        st.button(label_A, key="slot_A_recall", 
+                  on_click=recall_temp, args=['A'])
 
-    # B 버튼 불러오기
-    with recall_cols[1]:
+# B 슬롯
+with slot_cols[1]:
+    if st.session_state.is_saving:
+        # 저장 모드일 때 (저장 기능)
+        st.button("B 버튼 (현재 온도 저장)", key="slot_B_save", 
+                  on_click=save_temp_to_slot, args=['B'])
+    else:
+        # 일반 모드일 때 (불러오기 기능)
         label_B = f"B 불러오기 ({st.session_state.temp_B}°C)" if st.session_state.temp_B is not None else "B (저장된 온도 없음)"
-        if st.button(label_B, on_click=recall_temp, args=['B'], key="recall_B"):
-            if st.session_state.temp_B is not None:
-                st.success(f"B에 저장된 온도 ({st.session_state.temp_B}°C)를 불러왔습니다.")
+        st.button(label_B, key="slot_B_recall", 
+                  on_click=recall_temp, args=['B'])
 
-    # C 버튼 불러오기
-    with recall_cols[2]:
+# C 슬롯
+with slot_cols[2]:
+    if st.session_state.is_saving:
+        # 저장 모드일 때 (저장 기능)
+        st.button("C 버튼 (현재 온도 저장)", key="slot_C_save", 
+                  on_click=save_temp_to_slot, args=['C'])
+    else:
+        # 일반 모드일 때 (불러오기 기능)
         label_C = f"C 불러오기 ({st.session_state.temp_C}°C)" if st.session_state.temp_C is not None else "C (저장된 온도 없음)"
-        if st.button(label_C, on_click=recall_temp, args=['C'], key="recall_C"):
-            if st.session_state.temp_C is not None:
-                st.success(f"C에 저장된 온도 ({st.session_state.temp_C}°C)를 불러왔습니다.")
+        st.button(label_C, key="slot_C_recall", 
+                  on_click=recall_temp, args=['C'])
 
-# 팁: 스트림릿은 버튼을 누를 때마다 코드를 처음부터 다시 실행합니다. 
-# st.session_state를 사용하면 이전에 저장된 값을 유지할 수 있습니다.
+st.markdown("---")
+st.caption("팁: **💾 저장** 버튼을 누르면 A, B, C 버튼이 **저장** 기능으로 바뀝니다.")
